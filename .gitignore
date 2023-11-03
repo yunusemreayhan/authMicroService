@@ -1,0 +1,9 @@
+build
+sqlc
+*Identifier
+private*
+main
+*.gz
+__*
+Codehim*
+migrate
