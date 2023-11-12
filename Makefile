@@ -32,6 +32,7 @@ sqlc_generate:
 	sqlc generate
 
 test:
+	make key_generator
 	go clean -cache
 	SQL_DSN=postgresql://root:root@localhost:5431/auth_micro_service?sslmode=disable make reset_test_db
 	SQL_DSN=postgresql://root:root@localhost:5431/auth_micro_service?sslmode=disable go test -v ./...

@@ -19,7 +19,7 @@ func main() {
 	}
 
 	// Custom config
-	app.Static("/", "../../public", fiber.Static{
+	app.Static("/", "/public/", fiber.Static{
 		Compress:      true,
 		ByteRange:     true,
 		Browse:        true,
