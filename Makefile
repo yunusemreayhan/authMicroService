@@ -1,6 +1,6 @@
 
 create_pg_for_db:
-	docker run --name postgress_for_auth_micro_service -e POSTGRES_USER='root' -e POSTGRES_PASSWORD='root' -e PGPORT=5431 -p 5431:5431 -d postgres:12-alpine
+	docker run --name postgress_for_auth_micro_service -e POSTGRES_USER='root' -e POSTGRES_PASSWORD='root' -e PGPORT=${PGPORT} -p ${PGPORT}:${PGPORT} -d postgres:12-alpine
 	sleep 3
 	docker exec -it postgress_for_auth_micro_service createdb --username root --owner root auth_micro_service
 	cd db
@@ -31,11 +31,14 @@ reset_test_db: remove_pg_for_db create_pg_for_db
 sqlc_generate:
 	sqlc generate
 
-test:
-	make key_generator
+unit_test:
 	go clean -cache
-	SQL_DSN=postgresql://root:root@localhost:5431/auth_micro_service?sslmode=disable make reset_test_db
-	SQL_DSN=postgresql://root:root@localhost:5431/auth_micro_service?sslmode=disable go test -v ./...
+	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable make reset_test_db
+	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable go test -v ./...
+	make remove_pg_for_db
+
+integration_test:
+	py.test-3 --capture=no ./test/integration/simple_auth_calls.py
 
 generate: sqlc_generate
 
@@ -89,13 +92,13 @@ clean_compose_all:
 	docker volume rm authmicroservice_db-data || echo "auth_micro_service_db_data is not running"
 
 clean_compose:
-	docker compose down -t 15 --remove-orphans
+	docker compose down -t 15 --remove-orphans --rmi "local"
 	sleep 5
-	docker rmi authmicroservice-auth_micro_service_backend || echo "auth_micro_service_backend is not running"
-	docker rmi authmicroservice-migration || echo "migration is not running"
+	docker ps -a
+	docker image ls
 
 clean_compose_test:
-	docker compose down -t 15 --remove-orphans
+	docker compose down -t 15 --remove-orphans --rmi "local"
 	sleep 5
-	docker rmi authmicroservice-auth_micro_service_backend || echo "auth_micro_service_backend is not running"
-	docker rmi authmicroservice-migration_test || echo "migration_test is not running"
+	docker ps -a
+	docker image ls

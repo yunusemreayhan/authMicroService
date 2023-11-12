@@ -36,12 +36,10 @@ func RegisterPerson(c *fiber.Ctx) error {
 	res := json.Unmarshal(c.Request().Body(), &request)
 
 	if res != nil {
-		log.Default().Printf("unmarshall failed %v while parsing %v", res, string(c.Request().Body()))
 		username = c.FormValue("username")
 		password = c.FormValue("password")
 		email = c.FormValue("email")
 	} else {
-		log.Default().Printf("unmarshall success %v", request)
 		username = request.Username
 		password = request.Password
 		email = request.Email
@@ -93,13 +91,11 @@ func LoginPerson(c *fiber.Ctx) error {
 	res := json.Unmarshal(c.Request().Body(), &request)
 
 	if res != nil {
-		log.Default().Printf("unmarshall failed %v while parsing %v", res, string(c.Request().Body()))
 		// Handle person login
 		username = c.FormValue("username")
 		email = c.FormValue("email")
 		password = c.FormValue("password")
 	} else {
-		log.Default().Printf("unmarshall success %v", request)
 		username = request.Username
 		email = request.Email
 		password = request.Password
@@ -129,14 +125,14 @@ func LoginPerson(c *fiber.Ctx) error {
 	if email != "" {
 		voucherOwnerPerson, errDB = queries.GetPersonByEmail(ctx, email)
 		if errDB != nil {
-			return fiber.NewError(fiber.StatusBadRequest, "DB person with email "+email+"  not exist error "+errDB.Error())
+			return fiber.NewError(fiber.StatusBadRequest, "DB person with email ["+email+"] not exist error ["+errDB.Error()+"]")
 		}
 	}
 
 	if username != "" {
 		voucherOwnerPerson, errDB = queries.GetPersonByPersonName(ctx, username)
 		if errDB != nil {
-			return fiber.NewError(fiber.StatusBadRequest, "DB person with username "+username+" not exist error "+errDB.Error())
+			return fiber.NewError(fiber.StatusBadRequest, "DB person with username ["+username+"] not exist error ["+errDB.Error()+"]")
 		}
 	}
 
@@ -153,12 +149,12 @@ func LoginPerson(c *fiber.Ctx) error {
 	// Generate encoded voucher and send it as response.
 	privateKey, err := key.LoadPrivateKey(key.DefaultKeyPath)
 	if err != nil {
-		log.Printf("key.LoadPrivateKey: %v", err)
+		log.Printf("key.LoadPrivateKey: [%v]\n", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	t, err := token.SignedString(privateKey)
 	if err != nil {
-		log.Printf("token.SignedString: %v", err)
+		log.Printf("token.SignedString: [%v]\n", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
@@ -169,7 +165,7 @@ func decodeSegment(signature string) (sig []byte) {
 	var err error
 	sig, err = jwt.NewParser().DecodeSegment(signature)
 	if err != nil {
-		log.Printf("could not decode segment: %v", err)
+		log.Printf("could not decode segment: [%v]\n", err)
 	}
 
 	return
@@ -188,30 +184,35 @@ func VerifyToken(c *fiber.Ctx) error {
 	res := json.Unmarshal(c.Request().Body(), &request)
 
 	if res != nil {
-		log.Printf("json.Unmarshal error : %v failed to parse request %v", res, string(c.Request().Body()))
+		log.Printf("json.Unmarshal error : [%v] failed to parse request [%v]\n", res, string(c.Request().Body()))
 		return fiber.NewError(fiber.StatusBadRequest, "Was not able to parse request json json.Unmarshal: "+res.Error())
 	}
 
 	// Generate encoded voucher and send it as response.
 	privateKey, err := key.LoadPrivateKey(key.DefaultKeyPath)
 	if err != nil {
-		log.Printf("key.LoadPrivateKey: %v", err)
+		log.Printf("key.LoadPrivateKey: [%v]\n", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	token, err := jwt.Parse(request.Token, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("Unexpected signing method: [%v]", token.Header["alg"])
 		}
 
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 		return privateKey.Public(), nil
 	})
 
-	switch {
-	case token.Valid:
+	if err == nil {
+		if token == nil {
+			return c.SendStatus(fiber.StatusUnauthorized)
+		}
 		return c.SendStatus(fiber.StatusOK)
+	}
+
+	switch {
 	case errors.Is(err, jwt.ErrTokenMalformed):
 		fmt.Println("That's not even a token")
 		return c.SendStatus(fiber.StatusUnauthorized)
@@ -257,7 +258,7 @@ func UpdatePerson(c *fiber.Ctx) error {
 
 	voucherOwnerPerson, errDB := queries.GetPersonByPersonName(ctx, username)
 	if errDB != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "DB person with username "+username+"  not exist error "+errDB.Error())
+		return fiber.NewError(fiber.StatusBadRequest, "DB person with username ["+username+"]  not exist error ["+errDB.Error()+"]")
 	}
 
 	if c.Method() == "POST" {
@@ -274,7 +275,7 @@ func UpdatePerson(c *fiber.Ctx) error {
 		})
 
 		if errDB != nil {
-			return fiber.NewError(fiber.StatusBadRequest, "Failed to update person password "+errDB.Error())
+			return fiber.NewError(fiber.StatusBadRequest, "Failed to update person password ["+errDB.Error()+"]")
 		}
 
 		return c.SendString("Password updated successfully!")
