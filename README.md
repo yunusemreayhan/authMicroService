@@ -8,8 +8,8 @@ make clean_compose
 
 # how to unittest
 
-make test
+make unit_test
 
-# how to integration test
+# how to component test
 
-./test/integration/simple_auth_calls.py
+make component_test

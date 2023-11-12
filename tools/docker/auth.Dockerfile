@@ -1,4 +1,4 @@
-FROM golang:alpine as build
+FROM golang:alpine as runner
 FROM alpine:3.5
 
 # Add the binary
