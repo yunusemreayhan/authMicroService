@@ -1,6 +1,6 @@
 
 create_pg_for_db:
-	docker run --name postgress_for_auth_micro_service -e POSTGRES_USER='root' -e POSTGRES_PASSWORD='root' -e PGPORT=5431 -p 5431:5431 -d postgres:12-alpine
+	docker run --name postgress_for_auth_micro_service -e POSTGRES_USER='root' -e POSTGRES_PASSWORD='root' -e PGPORT=${PGPORT} -p ${PGPORT}:${PGPORT} -d postgres:12-alpine
 	sleep 3
 	docker exec -it postgress_for_auth_micro_service createdb --username root --owner root auth_micro_service
 	cd db
@@ -29,15 +29,21 @@ init_migration:
 reset_test_db: remove_pg_for_db create_pg_for_db
 
 sqlc_generate:
-	sqlc generate
+	docker pull sqlc/sqlc
+	docker run --rm -v $(CURDIR):/src -w /src sqlc/sqlc generate
 
-test:
-	make key_generator
+unit_test:
 	go clean -cache
-	SQL_DSN=postgresql://root:root@localhost:5431/auth_micro_service?sslmode=disable make reset_test_db
-	SQL_DSN=postgresql://root:root@localhost:5431/auth_micro_service?sslmode=disable go test -v ./...
+	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable make reset_test_db
+	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable go test -v ./db/test/...
+	make remove_pg_for_db
 
-generate: sqlc_generate
+component_test:
+	make compose_test
+	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable go test -v ./test/... || echo
+	make clean_compose_test
+
+generate: sqlc_generate swagger_gendoc
 
 clean:
 	rm -rf ./db/sqlc
@@ -67,35 +73,40 @@ start_docker:
 	docker logs auth_micro_service_instance
 
 all:
-	./tools/install_local_dependencies.py
 	make auth_micro_service 
 	./tools/download_migrate.py
 
 compose:
 	make all
 	make remove_pg_for_db
+	make clean_compose
 	docker compose up --detach	
 
 compose_test:
 	make all
+	make clean_compose_test
 	docker compose -f ./compose_test.yaml up --detach	
 
 clean_compose_all:
 	@echo -n "Are you sure about removing production database? [y/N] " && read ans && [ $${ans:-N} = y ]
 	docker compose down -t 15 --remove-orphans --volumes
-	sleep 5
 	docker rmi authmicroservice-auth_micro_service_backend || echo "auth_micro_service_backend is not running"
 	docker rmi authmicroservice-migration || echo "migration is not running"
 	docker volume rm authmicroservice_db-data || echo "auth_micro_service_db_data is not running"
 
 clean_compose:
-	docker compose down -t 15 --remove-orphans
-	sleep 5
-	docker rmi authmicroservice-auth_micro_service_backend || echo "auth_micro_service_backend is not running"
-	docker rmi authmicroservice-migration || echo "migration is not running"
+	docker compose down -t 15 --remove-orphans --rmi "local"
+	docker ps -a
+	docker image ls
 
 clean_compose_test:
-	docker compose down -t 15 --remove-orphans
-	sleep 5
-	docker rmi authmicroservice-auth_micro_service_backend || echo "auth_micro_service_backend is not running"
-	docker rmi authmicroservice-migration_test || echo "migration_test is not running"
+	docker compose down -t 15 --remove-orphans --rmi "local"
+	docker ps -a
+	docker image ls
+
+swagger_gendoc:
+	docker pull quay.io/goswagger/swagger
+	docker run --rm -it  --user $(shell id -u):$(shell id -g) -v ${HOME}:${HOME} -w $(CURDIR) \
+		-e GOCACHE=$(shell go env GOCACHE):/go/cache \
+		-e GOMODCACHE=$(shell go env GOMODCACHE):/go/modcache \
+		-e GOPATH=$(shell go env GOPATH):/go quay.io/goswagger/swagger generate spec -o ./swagger.json

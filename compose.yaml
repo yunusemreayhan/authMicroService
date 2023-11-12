@@ -17,6 +17,8 @@ services:
     build:
       context: ./
       dockerfile: tools/docker/migration.Dockerfile
+    environment:
+      - SQL_DSN=postgresql://root:root@auth_micro_service_db_test:5431/auth_micro_service?sslmode=disable
     depends_on:
       auth_micro_service_db:
         condition: service_healthy
