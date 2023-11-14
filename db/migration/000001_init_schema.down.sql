@@ -1,3 +1,0 @@
-DROP TABLE IF EXISTS "title_person";
-DROP TABLE IF EXISTS "title";
-DROP TABLE IF EXISTS "person";
