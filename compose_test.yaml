@@ -54,7 +54,7 @@ services:
         target: /etc/nginx/conf.d/default.conf
         read_only: true
     ports:
-      - 80:80
+      - 8001:8001
     depends_on: 
       - auth_micro_service_backend_test
     networks:

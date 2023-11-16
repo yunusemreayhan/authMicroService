@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/valyala/fasthttp"
+	"github.com/yunusemreayhan/goAuthMicroService/internal/config"
 	"log"
 	"time"
 
@@ -34,7 +36,12 @@ func RegisterPerson(c *fiber.Ctx) error {
 	var request model.RegistrationRequest
 	var username, email, password string
 	res := json.Unmarshal(c.Request().Body(), &request)
-	defer c.Request().CloseBodyStream()
+	defer func(request *fasthttp.Request) {
+		err := request.CloseBodyStream()
+		if err != nil {
+			log.Default().Printf("request.CloseBodyStream error : [%v]\n", err)
+		}
+	}(c.Request())
 
 	if res != nil {
 		username = c.FormValue("username")
@@ -61,7 +68,12 @@ func RegisterPerson(c *fiber.Ctx) error {
 		})
 	}
 
-	defer con.Close(ctx)
+	defer func(con *pgx.Conn, ctx context.Context) {
+		err := con.Close(ctx)
+		if err != nil {
+			log.Default().Printf("con.Close error : [%v]\n", err)
+		}
+	}(con, ctx)
 
 	queries := sqlc.New(con)
 	person, errDB := queries.CreatePerson(ctx, sqlc.CreatePersonParams{
@@ -83,6 +95,7 @@ func RegisterPerson(c *fiber.Ctx) error {
 	})
 }
 
+// LoginPerson
 // @Summary Person Login
 // @Description Log in a person and receive a JWT token
 // @ID login-person
@@ -96,7 +109,12 @@ func LoginPerson(c *fiber.Ctx) error {
 	var request model.LoginRequest
 	var username, email, password string
 	res := json.Unmarshal(c.Request().Body(), &request)
-	defer c.Request().CloseBodyStream()
+	defer func(request *fasthttp.Request) {
+		err := request.CloseBodyStream()
+		if err != nil {
+			log.Default().Printf("request.CloseBodyStream error : [%v]\n", err)
+		}
+	}(c.Request())
 
 	if res != nil {
 		// Handle person login
@@ -130,7 +148,12 @@ func LoginPerson(c *fiber.Ctx) error {
 		})
 	}
 
-	defer con.Close(ctx)
+	defer func(con *pgx.Conn, ctx context.Context) {
+		err := con.Close(ctx)
+		if err != nil {
+			log.Default().Printf("con.Close error : [%v]\n", err)
+		}
+	}(con, ctx)
 
 	queries := sqlc.New(con)
 
@@ -164,7 +187,7 @@ func LoginPerson(c *fiber.Ctx) error {
 	claims := jwt.MapClaims{
 		"identifier": model.JWTIdentity{Id: voucherOwnerPerson.ID, Username: voucherOwnerPerson.Personname, Email: voucherOwnerPerson.Email},
 		"admin":      true,
-		"exp":        time.Now().Add(time.Hour * 72).Unix(),
+		"exp":        time.Now().Add(time.Duration(config.GetConfig().TokenTimeoutSeconds) * time.Second).Unix(),
 	}
 
 	// Create voucher
@@ -185,16 +208,7 @@ func LoginPerson(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"voucher": t})
 }
 
-func decodeSegment(signature string) (sig []byte) {
-	var err error
-	sig, err = jwt.NewParser().DecodeSegment(signature)
-	if err != nil {
-		log.Printf("could not decode segment: [%v]\n", err)
-	}
-
-	return
-}
-
+// VerifyToken
 // @Summary Token Verification
 // @Description Verify the provided JWT token
 // @ID verify-token
@@ -206,11 +220,16 @@ func decodeSegment(signature string) (sig []byte) {
 func VerifyToken(c *fiber.Ctx) error {
 	var request model.VerifyVoucherRequest
 	res := json.Unmarshal(c.Request().Body(), &request)
-	defer c.Request().CloseBodyStream()
+	defer func(request *fasthttp.Request) {
+		err := request.CloseBodyStream()
+		if err != nil {
+			log.Default().Printf("request.CloseBodyStream error : [%v]\n", err)
+		}
+	}(c.Request())
 
 	if res != nil {
 		log.Printf("json.Unmarshal error : [%v] failed to parse request [%v]\n", res, string(c.Request().Body()))
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Was not able to parse request json json.Unmarshal: [%s]", res.Error())})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf(`Was not able to parse request json json.Unmarshal: [%s]`, res.Error())})
 	}
 
 	// Generate encoded voucher and send it as response.
@@ -223,7 +242,7 @@ func VerifyToken(c *fiber.Ctx) error {
 	token, err := jwt.Parse(request.Token, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: [%v]", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: [%v]", token.Header["alg"])
 		}
 
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
@@ -251,6 +270,7 @@ func VerifyToken(c *fiber.Ctx) error {
 
 // Person Database Microservice
 
+// UpdatePerson
 // @Summary Update Person Information
 // @Description Update person information in the database
 // @ID create-person
@@ -273,19 +293,24 @@ func UpdatePerson(c *fiber.Ctx) error {
 		})
 	}
 
-	defer con.Close(ctx)
+	defer func(con *pgx.Conn, ctx context.Context) {
+		err := con.Close(ctx)
+		if err != nil {
+			log.Default().Printf("con.Close error : [%v]\n", err)
+		}
+	}(con, ctx)
 
 	queries := sqlc.New(con)
 
-	voucherOwnerPerson, errUserNameDB := queries.GetPersonByPersonName(ctx, username)
-	voucherOwnerPerson, errEmailDB := queries.GetPersonByEmail(ctx, username)
-	if errEmailDB != nil && errUserNameDB != nil {
+	voucherOwnerPerson, errQueryUser := queries.GetPersonByPersonName(ctx, username)
+	if errQueryUser != nil {
+		log.Default().Printf("DB person with username [%s]  not exist error [%s]\n", username, errQueryUser.Error())
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": fmt.Sprintf("DB person with username/email [%s]  not exist error [%s]", username, errEmailDB.Error()),
+			"error": fmt.Sprintf("DB person with username [%s]  not exist error [%s]", username, errQueryUser.Error()),
 		})
 	}
 
-	if c.Method() == "POST" {
+	if c.Method() == "PUT" {
 		// Handle person login
 		password := c.FormValue("password")
 
@@ -309,14 +334,9 @@ func UpdatePerson(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 			"error": "",
 		})
-	} else if c.Method() == "GET" {
-
-		// shadow password
-		voucherOwnerPerson.PasswordHash = "*****"
-
-		return c.JSON(voucherOwnerPerson)
 	}
-	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-		"error": "Bad request",
+
+	return c.Status(fiber.StatusMethodNotAllowed).JSON(fiber.Map{
+		"error": "Method not allowed!",
 	})
 }

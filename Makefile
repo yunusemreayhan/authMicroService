@@ -88,10 +88,9 @@ compose_test:
 
 clean_compose_all:
 	@echo -n "Are you sure about removing production database? [y/N] " && read ans && [ $${ans:-N} = y ]
-	docker compose down -t 15 --remove-orphans --volumes
-	docker rmi authmicroservice-auth_micro_service_backend || echo "auth_micro_service_backend is not running"
-	docker rmi authmicroservice-migration || echo "migration is not running"
-	docker volume rm authmicroservice_db-data || echo "auth_micro_service_db_data is not running"
+	docker compose down -t 15 --remove-orphans --volumes --rmi "local"
+	docker ps -a
+	docker image ls
 
 clean_compose:
 	docker compose down -t 15 --remove-orphans --rmi "local"
