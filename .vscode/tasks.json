@@ -1,0 +1,38 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "create_pg_for_test",
+			"command": "make create_pg_for_test",
+			"runOptions": {
+				"instanceLimit": 1,
+				"reevaluateOnRerun": true
+			},
+			"type": "shell",
+			"dependsOn": [
+				"remove_pg_for_test"
+			]
+		},
+		{
+			"label": "remove_pg_for_test",
+			"command": "make remove_pg_for_test",
+			"runOptions": {
+				"instanceLimit": 1,
+				"reevaluateOnRerun": true
+			},
+			"type": "shell",
+			"dependsOn": [
+				"build_all"
+			]
+		},
+		{
+			"label": "build_all",
+			"command": "make all",
+			"runOptions": {
+				"instanceLimit": 1,
+				"reevaluateOnRerun": true
+			},
+			"type": "shell"
+		},
+	]
+}

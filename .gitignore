@@ -7,3 +7,12 @@ main
 __*
 Codehim*
 migrate
+
+---ignores for swagger gen files
+models
+restapi/doc.go
+restapi/embedded_spec.go
+restapi/operations/
+restapi/server.go
+cmd/auth-micro-service-server
+cmd/auth_micro_service_server

@@ -10,7 +10,19 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/auth/main.go"
+        },
+        {
+            "name": "test auth api",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}/test/",
+            "preLaunchTask": "create_pg_for_test",
+            "env": {
+                "SQL_DSN": "postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable",
+                "PG_PORT": "5435"
+            },
+            "postDebugTask": "remove_pg_for_test"
         }
-
     ]
 }

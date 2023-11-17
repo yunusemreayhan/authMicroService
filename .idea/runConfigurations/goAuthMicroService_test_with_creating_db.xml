@@ -1,0 +1,20 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="goAuthMicroService/test with creating db" type="GoTestRunConfiguration" factoryName="Go Test">
+    <module name="authMicroService2" />
+    <working_directory value="$PROJECT_DIR$/test" />
+    <envs>
+      <env name="PGPORT" value="5435" />
+      <env name="SQL_DSN" value="postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable" />
+    </envs>
+    <root_directory value="$PROJECT_DIR$" />
+    <kind value="PACKAGE" />
+    <package value="github.com/yunusemreayhan/goAuthMicroService/test" />
+    <directory value="$PROJECT_DIR$/test" />
+    <filePath value="$PROJECT_DIR$" />
+    <framework value="gotest" />
+    <method v="2">
+      <option name="RunConfigurationTask" enabled="true" run_configuration_name="remove_pg_for_test" run_configuration_type="MAKEFILE_TARGET_RUN_CONFIGURATION" />
+      <option name="RunConfigurationTask" enabled="true" run_configuration_name="create_pg_for_test" run_configuration_type="MAKEFILE_TARGET_RUN_CONFIGURATION" />
+    </method>
+  </configuration>
+</component>

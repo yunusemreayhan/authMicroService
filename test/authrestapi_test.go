@@ -3,298 +3,167 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/yunusemreayhan/goAuthMicroService/internal/model"
+	"github.com/stretchr/testify/require"
+	"github.com/yunusemreayhan/goAuthMicroService/models"
+	"github.com/yunusemreayhan/goAuthMicroService/restapi"
 )
 
 const (
-	testingPort  = 8001
-	testUsername = "test3"
-	testPassword = "test3"
-	testEmail    = "test3@gmail.com"
+	testUsername  = "test3"
+	testPassword  = "test3"
+	testPassword2 = "test3_2"
+	testEmail     = "test3@gmail.com"
 )
 
-var (
-	httpClient = &http.Client{
-		Transport: &http.Transport{
-			IdleConnTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
-	}
-)
-
-type Data struct {
-	url                string
-	jsonRequest        string
-	expectedStatusCode int32
+var client = &http.Client{
+	Transport: &http.Transport{
+		IdleConnTimeout: 30 * time.Second,
+	},
+	Timeout: 30 * time.Second,
 }
 
-func registerTestUser() *http.Response {
-	regreq := model.RegistrationRequest{
-		Username: testUsername,
-		Email:    testEmail,
-		Password: testPassword,
-	}
-	url := fmt.Sprintf("http://localhost:%d/api/register", testingPort)
-	regreqbytes, _ := json.Marshal(regreq)
-	log.Default().Println("registering with this request", string(regreqbytes))
-	req, err := http.NewRequest("POST", url, strings.NewReader(string(regreqbytes)))
-	if err != nil {
-		log.Default().Println("Error while sending request", err)
-		return nil
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		log.Default().Println("Error sending request:", err)
-		return nil
-	}
-	return resp
-}
+var server *httptest.Server
 
-func getProperVoucher() (*string, error) {
-	loginreq := model.LoginRequest{
-		Username: testUsername,
-		Password: testPassword,
-	}
-	url := fmt.Sprintf("http://localhost:%d/api/login", testingPort)
-	loginreqbytes, _ := json.Marshal(loginreq)
-	req, err := http.NewRequest("POST", url, strings.NewReader(string(loginreqbytes)))
-	if err != nil {
-		log.Default().Println("Error while sending request", err)
-		return nil, err
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		log.Default().Println("Error sending request:", err)
-		return nil, err
-	}
-	var modelResponse model.LoginResponse
-	_ = json.NewDecoder(resp.Body).Decode(&modelResponse)
-	if modelResponse.Error != "" {
-		log.Default().Println("Error while sending request", modelResponse.Error)
-		return nil, fmt.Errorf("error while logging in : [%s]", modelResponse.Error)
-	}
-	if modelResponse.Token == "" {
-		log.Default().Println("Both error and Token is empty!")
-		return nil, fmt.Errorf("both error and Token is empty")
-	}
-	return &modelResponse.Token, nil
-}
+var httpHandler *http.Handler
 
-func handlerForRegister(datai interface{}, client *http.Client) bool {
-	data := datai.(Data)
-	url := data.url
-	jsonData := data.jsonRequest
-
-	// Create a new HTTP request
-	req, err := http.NewRequest("POST", url, strings.NewReader(jsonData))
-	if err != nil {
-		log.Default().Println("Error while sending request", err)
-		return false
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Default().Println("Error sending request:", err)
-		return false
-	}
+func bodyCloser(body io.ReadCloser) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			log.Default().Println("Error closing response body:", err)
+			log.Default().Printf("Body.Close error : [%v]\n", err)
 		}
-	}(resp.Body)
-	if resp.StatusCode == int(data.expectedStatusCode) {
-		return true
-	} else {
-		log.Default().Println("Expected status code:", data.expectedStatusCode, "but got:", resp)
-		log.Default().Println("Data : ", data)
-		var modelRegisterResponse model.RegistrationResponse
-		err = json.NewDecoder(resp.Body).Decode(&modelRegisterResponse)
+	}(body)
+}
+func TestAuthApi(t *testing.T) {
+	if httpHandler == nil {
+		handler, err := restapi.GetAPIHandler()
 		if err != nil {
-			log.Default().Println("Error reading response body:", err)
-			return false
+			t.Fatal("get api handler", err)
 		}
-		log.Default().Printf("Response body: [%v]", modelRegisterResponse)
-		return false
+		httpHandler = &handler
 	}
+	if server == nil {
+		server = httptest.NewServer(*httpHandler)
+	}
+
+	registrationResponse := registerTestPerson(t)
+
+	var err error
+	_, err = login(t, err, testUsername, testPassword+"wrong")
+	require.Error(t, err)
+
+	token, err := login(t, err, testUsername, testPassword)
+	require.NoError(t, err)
+
+	err = verifyToken(t, err, token)
+	require.NoError(t, err)
+
+	err = verifyToken(t, err, "wrong")
+	require.Error(t, err)
+
+	err = changePassword(t, err, registrationResponse.ID, token)
+
+	_, err = login(t, err, testUsername, testPassword)
+	require.Error(t, err)
+	token, err = login(t, err, testUsername, testPassword2)
+	require.NoError(t, err)
+
+	deletePerson(t, err, registrationResponse.ID, token)
+
+	registrationResponse = registerTestPerson(t)
 }
 
-func handlerForLogin(datai interface{}, client *http.Client) bool {
-	data := datai.(Data)
-	url := data.url
-	jsonData := data.jsonRequest
-
-	// Create a new HTTP request
-	req, err := http.NewRequest("POST", url, strings.NewReader(jsonData))
-	if err != nil {
-		log.Default().Println("Error while sending request", err)
-		return false
+func verifyToken(t *testing.T, err error, token string) error {
+	verifyReq, err := http.NewRequest("GET", server.URL+"/api/verify", strings.NewReader(""))
+	require.NoError(t, err)
+	verifyReq.Header.Set("Content-Type", "application/json")
+	verifyReq.Header.Add("oauth_token", token)
+	verifyResp, err := client.Do(verifyReq)
+	require.NoError(t, err)
+	if verifyResp.StatusCode != http.StatusOK {
+		var mError models.Error
+		err = json.NewDecoder(verifyResp.Body).Decode(&mError)
+		defer bodyCloser(verifyResp.Body)
+		require.NoError(t, err)
+		log.Default().Printf("verify token resp : [%#v]\n", mError)
+		return fmt.Errorf("verify token resp : [%#v]", mError)
 	}
-	// Set the request content type to JSON
-	req.Header.Set("Content-Type", "application/json")
-
-	// Send the request
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Default().Println("Error sending request:", err)
-		return false
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Default().Println("Error closing response body:", err)
-		}
-	}(resp.Body)
-	if resp.StatusCode == int(data.expectedStatusCode) {
-		var loginResp model.LoginResponse
-		err = json.NewDecoder(resp.Body).Decode(&loginResp)
-		if err != nil {
-			log.Default().Println("Error decoding response:", err)
-			return false
-		}
-		if data.expectedStatusCode == 200 {
-
-			return true
-		} else {
-			log.Default().Println("Error in reponse :", loginResp.Error)
-			return true
-		}
-	} else {
-		log.Default().Println("Expected status code:", data.expectedStatusCode, "but got:", resp)
-		log.Default().Println("Data : ", data)
-		var modelLoginResponse model.LoginResponse
-		err = json.NewDecoder(resp.Body).Decode(&modelLoginResponse)
-		if err != nil {
-			log.Default().Println("Error reading response body:", err)
-			return false
-		}
-		log.Default().Printf("Response body: [%v]", modelLoginResponse)
-		return false
-	}
+	return nil
 }
 
-func handlerForVerify(datai interface{}, client *http.Client) bool {
-	data := datai.(Data)
-	url := data.url
-	jsonData := data.jsonRequest
-
-	var verifyRequest model.VerifyVoucherRequest
-
-	err := json.Unmarshal([]byte(jsonData), &verifyRequest)
-
-	if err != nil {
-		log.Default().Println("Error decoding request for test:", err)
-		return false
+func changePassword(t *testing.T, err error, id int64, token string) error {
+	changePassReq, err := http.NewRequest("PUT", fmt.Sprintf("%s/api/person/%d", server.URL, id), strings.NewReader(fmt.Sprintf("{\"person_name\":\"%s\",\"email\":\"%s\",\"password\":\"%s\"}", testUsername, testEmail, testPassword2)))
+	require.NoError(t, err)
+	changePassReq.Header.Set("Content-Type", "application/json")
+	changePassReq.Header.Add("oauth_token", token)
+	changePassResp, err := client.Do(changePassReq)
+	require.NoError(t, err)
+	if changePassResp.StatusCode != http.StatusOK {
+		var mError models.Error
+		err = json.NewDecoder(changePassResp.Body).Decode(&mError)
+		defer bodyCloser(changePassResp.Body)
+		require.NoError(t, err)
+		log.Default().Printf("change password resp : [%#v]\n", mError)
 	}
-
-	if verifyRequest.Token == "proper" {
-		resp := registerTestUser()
-		if resp == nil || resp.StatusCode != 200 {
-
-			var modelRegisterResponse model.RegistrationResponse
-			err = json.NewDecoder(resp.Body).Decode(&modelRegisterResponse)
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
-				if err != nil {
-					log.Default().Println("Error closing response body:", err)
-				}
-			}(resp.Body)
-			log.Default().Printf("Error registering test user for voucher [%v] %d", modelRegisterResponse, resp.StatusCode)
-			if !strings.Contains(fmt.Sprintf("%v", modelRegisterResponse), "duplicate key value") {
-				return false
-			}
-		}
-		token, errGetToken := getProperVoucher()
-		if errGetToken != nil {
-			log.Default().Println("Error getting proper voucher:", errGetToken)
-			return false
-		}
-		verifyRequest.Token = *token
-	}
-	verifyRequestBytes, err := json.Marshal(verifyRequest)
-	if err != nil {
-		log.Default().Println("Error marshaling verifyRequest:", err)
-		return false
-	}
-	// Create a new HTTP request
-	req, err := http.NewRequest("POST", url, strings.NewReader(string(verifyRequestBytes)))
-	if err != nil {
-		log.Default().Println("Error while sending request", err)
-		return false
-	}
-	// Set the request content type to JSON
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Default().Println("Error sending request:", err)
-		return false
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Default().Println("Error closing response body:", err)
-		}
-	}(resp.Body)
-	if resp.StatusCode == int(data.expectedStatusCode) {
-		return true
-	} else {
-		log.Default().Println("Expected status code:", data.expectedStatusCode, "but got:", resp)
-		log.Default().Println("Data : ", data)
-		var modelVerifyResponse model.VerifyVoucherResponse
-		err = json.NewDecoder(resp.Body).Decode(&modelVerifyResponse)
-		if err != nil {
-			log.Default().Println("Error reading response body:", err)
-			return false
-		}
-		log.Default().Printf("Response body: [%v]", modelVerifyResponse)
-		return false
-	}
+	require.Equal(t, http.StatusOK, changePassResp.StatusCode)
+	return err
 }
 
-func TestAuthApiRegister(t *testing.T) {
-	assert.Equal(t, handlerForRegister(Data{
-		url:                fmt.Sprintf("http://localhost:%d/api/register", testingPort),
-		jsonRequest:        `{"username":"test", "email":"test@test.com", "password":"12345"}`,
-		expectedStatusCode: 200,
-	}, httpClient), true)
+func deletePerson(t *testing.T, err error, id int64, token string) {
+	deleteReq, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/person/%d", server.URL, id), strings.NewReader(""))
+	require.NoError(t, err)
+	deleteReq.Header.Set("Content-Type", "application/json")
+	deleteReq.Header.Add("oauth_token", token)
+	deleteResp, err := client.Do(deleteReq)
+	require.NoError(t, err)
+	if deleteResp.StatusCode != http.StatusNoContent {
+		var mError models.Error
+		err = json.NewDecoder(deleteResp.Body).Decode(&mError)
+		defer bodyCloser(deleteResp.Body)
+		require.NoError(t, err)
+		log.Default().Printf("delete person resp : [%#v]\n", mError)
+	}
+	require.Equal(t, http.StatusNoContent, deleteResp.StatusCode)
 }
 
-func TestAuthApiLoginProperCredentials(t *testing.T) {
-	assert.Equal(t, handlerForLogin(Data{
-		url:                fmt.Sprintf("http://localhost:%d/api/login", testingPort),
-		jsonRequest:        `{"username":"test", "email":"test@test.com", "password":"12345"}`,
-		expectedStatusCode: 200,
-	}, httpClient), true)
+func registerTestPerson(t *testing.T) models.RegistrationResponse {
+	// register
+	registerReq, err := http.NewRequest("POST", server.URL+"/api/register", strings.NewReader(fmt.Sprintf(`{"person_name":"%s","email":"%s","password":"%s"}`, testUsername, testEmail, testPassword)))
+	require.NoError(t, err)
+	registerReq.Header.Set("Content-Type", "application/json")
+	respFromRegister, err := client.Do(registerReq)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, respFromRegister.StatusCode)
+	var registrationResponse models.RegistrationResponse
+	err = json.NewDecoder(respFromRegister.Body).Decode(&registrationResponse)
+	defer bodyCloser(respFromRegister.Body)
+	require.NoError(t, err)
+	log.Default().Printf("resp : [%#v]\n", registrationResponse)
+	return registrationResponse
 }
 
-func TestAuthApiLoginWrongCredentials(t *testing.T) {
-	assert.Equal(t, handlerForLogin(Data{
-		url:                fmt.Sprintf("http://localhost:%d/api/login", testingPort),
-		jsonRequest:        `{"username":"test", "password":"123456"}`,
-		expectedStatusCode: 401,
-	}, httpClient), true)
-}
-
-func TestAuthApiVerifyProperToken(t *testing.T) {
-	assert.Equal(t, handlerForVerify(Data{
-		url:                fmt.Sprintf("http://localhost:%d/api/verify", testingPort),
-		jsonRequest:        `{"voucher":"proper"}`,
-		expectedStatusCode: 200,
-	}, httpClient), true)
-}
-
-func TestAuthApiVerifyWrongToken(t *testing.T) {
-	assert.Equal(t, handlerForVerify(Data{
-		url:                fmt.Sprintf("http://localhost:%d/api/verify", testingPort),
-		jsonRequest:        `{"voucher":"nonproper"}`,
-		expectedStatusCode: 401,
-	}, httpClient), true)
+func login(t *testing.T, err error, username string, password string) (string, error) {
+	loginReq, err := http.NewRequest("POST", server.URL+"/api/login", strings.NewReader(""))
+	require.NoError(t, err)
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginReq.SetBasicAuth(username, password)
+	require.NoError(t, err)
+	respFromLogin, err := client.Do(loginReq)
+	if err != nil || respFromLogin.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("login error : [%v] [%v]", err, respFromLogin.StatusCode)
+	}
+	require.NoError(t, err)
+	var lResp models.LoginResponse
+	err = json.NewDecoder(respFromLogin.Body).Decode(&lResp)
+	defer bodyCloser(respFromLogin.Body)
+	log.Default().Printf("resp : [%#v]\n", lResp)
+	return *lResp.Token, nil
 }

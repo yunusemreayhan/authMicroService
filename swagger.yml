@@ -1,0 +1,285 @@
+swagger: '2.0'
+basePath: /
+host: localhost
+info:
+  version: 0.1.0
+  title: Auth swagger generated app
+  description: |
+    This sample swagger application
+  termsOfService: |
+    There are actually none.
+    This is for demonstration purpose only.
+  license:
+    name: 'Apache 2.0'
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  contact:
+    name: go-openapi maintainers
+    email: ayhanyunusemre@gmail.com
+    url: https://github.com/yunusemreayhan/
+securityDefinitions:
+  BasicAuth:
+    type: basic
+  ApiKeyAuth:
+    type: apiKey
+    in: header
+    name: oauth_token
+security:
+  - BasicAuth: []
+  - ApiKeyAuth: []
+consumes:
+  - application/json
+produces:
+  - application/json
+schemes:
+  - http
+  - https
+x-schemes:
+  - unix
+paths:
+  /api/register:
+    post:
+      summary: "Register a new user"
+      schemes:
+        - http
+        - https
+      tags: ["auth"]
+      security: []
+      operationId: register
+      parameters:
+        - name: body
+          in: body
+          schema:
+            $ref: "#/definitions/registrationRequest"
+      responses:
+        '201':
+          description: Created
+          schema:
+            $ref: "#/definitions/registrationResponse"
+        default:
+          description: error
+          schema:
+            $ref: "#/definitions/error"
+  /api/login:
+    post:
+      summary: "Login a user, and return a token"
+      schemes:
+        - http
+        - https
+      security:
+        - BasicAuth: []
+      tags: ["auth"]
+      operationId: login
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: "#/definitions/loginResponse"
+        default:
+          description: error
+          schema:
+            $ref: "#/definitions/error"
+  /api/verify:
+    get:
+      summary: "Verify a token"
+      schemes:
+        - http
+        - https
+      security:
+        - ApiKeyAuth: []
+      tags: ["auth"]
+      operationId: verify
+      responses:
+        '200':
+          description: OK
+        default:
+          description: error
+          schema:
+            $ref: "#/definitions/error"
+  /api/person/{id}:
+    parameters:
+      - type: integer
+        name: id
+        in: path
+        required: true
+        format: int64
+    put:
+      summary: "Set person"
+      schemes:
+        - http
+        - https
+      security:
+        - ApiKeyAuth: []
+      tags: ["person"]
+      operationId: updateOne
+      parameters:
+        - name: body
+          in: body
+          schema:
+            $ref: "#/definitions/person"
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: "#/definitions/person_without_password"
+        default:
+          description: error
+          schema:
+            $ref: "#/definitions/error"
+    delete:
+      summary: "Delete person"
+      schemes:
+        - http
+        - https
+      security:
+        - ApiKeyAuth: []
+      tags: ["person"]
+      operationId: destroyOne
+      responses:
+        '204':
+          description: Deleted
+        default:
+          description: error
+          schema:
+            $ref: "#/definitions/error"
+definitions:
+  registrationRequest:
+    type: object
+    required:
+      - person_name
+      - email
+      - password
+    properties:
+      person_name:
+        type: string
+        minLength: 1
+      email:
+        type: string
+        minLength: 1
+      password:
+        type: string
+        minLength: 1
+  registrationResponse:
+    type: object
+    required:
+      - person_name
+      - email
+    properties:
+      id:
+        type: integer
+        format: int64
+        readOnly: true
+      person_name:
+        type: string
+        minLength: 1
+      email:
+        type: string
+        minLength: 1
+  loginResponse:
+    type: object
+    required:
+      - token
+    properties:
+      token:
+        type: string
+        format: string
+  verifyResponse:
+    type: object
+    properties:
+      200:
+        description: OK
+      error:
+        type: object
+        $ref: "#/definitions/error"
+  voucherRequest:
+    type: object
+    required:
+      - token
+    properties:
+      token:
+        type: object
+        $ref: "#/definitions/voucher"
+  personRequest:
+    type: object
+    required:
+      - person_name
+      - email
+      - password
+    properties:
+      person_name:
+        type: string
+        minLength: 1
+      email:
+        type: string
+        minLength: 1
+      password:
+        type: string
+        minLength: 1
+  personResponse:
+    type: object
+    required:
+      - person_name
+      - email
+      - password
+    properties:
+      id:
+        type: integer
+        format: int64
+        readOnly: true
+      person_name:
+        type: string
+        minLength: 1
+      email:
+        type: string
+        minLength: 1
+      password:
+        type: string
+        minLength: 1
+  voucher:
+    type: string
+    format: string
+    properties:
+      token:
+        type: string
+        format: string
+  person:
+    type: object
+    required:
+      - person_name
+      - email
+      - password
+    properties:
+      person_name:
+        type: string
+        minLength: 1
+      email:
+        type: string
+        minLength: 1
+      password:
+        type: string
+        minLength: 1
+  person_without_password:
+    type: object
+    required:
+      - person_name
+      - email
+    properties:
+      id:
+        type: integer
+        format: int64
+        readOnly: true
+      person_name:
+        type: string
+        minLength: 1
+      email:
+        type: string
+        minLength: 1
+  error:
+    type: object
+    required:
+      - message
+    properties:
+      code:
+        type: integer
+        format: int64
+      message:
+        type: string

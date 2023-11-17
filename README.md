@@ -1,15 +1,11 @@
-# how to run
+# how to run in docker compose
 
 make compose
 
-# how to stop
+# how to stop docker compose
 
 make clean_compose
 
-# how to unittest
+# how to local run
 
-make unit_test
-
-# how to component test
-
-make component_test
+make local_run

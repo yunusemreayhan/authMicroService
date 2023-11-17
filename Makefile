@@ -1,13 +1,13 @@
 
-create_pg_for_db:
-	docker run --name postgress_for_auth_micro_service -e POSTGRES_USER='root' -e POSTGRES_PASSWORD='root' -e PGPORT=${PGPORT} -p ${PGPORT}:${PGPORT} -d postgres:12-alpine
-	sleep 3
+create_pg_for_test:
+	docker run --name postgress_for_auth_micro_service -e POSTGRES_USER='root' -e POSTGRES_PASSWORD='root' -e PGPORT=5435 -p 5435:5435 -d postgres:12-alpine
+	sleep 5
 	docker exec -it postgress_for_auth_micro_service createdb --username root --owner root auth_micro_service
 	cd db
 	make migrate_up
 	cd ..
 
-remove_pg_for_db:
+remove_pg_for_test:
 	docker stop postgress_for_auth_micro_service || echo
 	docker rm -f postgress_for_auth_micro_service || echo
 
@@ -18,15 +18,15 @@ bash_for_db:
 	docker exec -it postgress_for_auth_micro_service bash
 
 migrate_up:
-	migrate -path ./db/migration/ -database ${SQL_DSN} -verbose up
+	migrate -path ./db/migration/ -database postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable  -verbose up
 
 migrate_down:
-	migrate -path ./db/migration/ -database ${SQL_DSN} -verbose down
+	migrate -path ./db/migration/ -database postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable  -verbose down
 
 init_migration:
 	migrate create --ext sql --dir db/migration/ --seq init_schema
 
-reset_test_db: remove_pg_for_db create_pg_for_db
+reset_test_db: remove_pg_for_test create_pg_for_test
 
 sqlc_generate:
 	docker pull sqlc/sqlc
@@ -36,14 +36,14 @@ unit_test:
 	go clean -cache
 	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable make reset_test_db
 	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable go test -v ./db/test/...
-	make remove_pg_for_db
+	make remove_pg_for_test
 
 component_test:
-	make compose_test
-	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable go test -v ./test/... || echo
-	make clean_compose_test
+	make create_pg_for_test
+	PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable go test -v ./test/... && echo "component test passed" || echo "component test failed"
+	make remove_pg_for_test
 
-generate: sqlc_generate swagger_gendoc
+generate: sqlc_generate swagger_generate swagger_gendoc
 
 clean:
 	rm -rf ./db/sqlc
@@ -59,7 +59,7 @@ keys_for_auth:
 auth_micro_service_binary:
 	make generate
 	mkdir -p ./build
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -gcflags="all=-N -l"  -v  -o ./build/auth_micro_service ./cmd/auth/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -gcflags="all=-N -l"  -v  -o ./build/auth_micro_service_server ./cmd/auth-micro-service-server/main.go
 
 auth_micro_service_docker_image:
 	docker image rm -f auth_micro_service
@@ -77,7 +77,7 @@ all:
 
 compose:
 	make all
-	make remove_pg_for_db
+	make remove_pg_for_test
 	make clean_compose
 	docker compose up --detach	
 
@@ -108,3 +108,16 @@ swagger_gendoc:
 		-e GOCACHE=$(shell go env GOCACHE):/go/cache \
 		-e GOMODCACHE=$(shell go env GOMODCACHE):/go/modcache \
 		-e GOPATH=$(shell go env GOPATH):/go quay.io/goswagger/swagger generate spec -o ./swagger.json
+
+swagger_generate:
+	docker run --rm -it  --user $(shell id -u):$(shell id -g) -v ${HOME}:${HOME} -w $(CURDIR) \
+			-e GOCACHE=$(shell go env GOCACHE):/go/cache \
+			-e GOMODCACHE=$(shell go env GOMODCACHE):/go/modcache \
+			-e GOPATH=$(shell go env GOPATH):/go quay.io/goswagger/swagger generate server -A auth_micro_service -f ./swagger.yml
+
+local_run:
+	make all
+	make remove_pg_for_test
+	make create_pg_for_test
+	sudo rm -rf /var/run/auth-micro-service.sock
+	sudo PGPORT=5435 SQL_DSN=postgresql://root:root@localhost:5435/auth_micro_service?sslmode=disable ./build/auth_micro_service_server  --tls-certificate ./internal/key/mycert1.crt --tls-key ./internal/key/mycert1.key --port 4000

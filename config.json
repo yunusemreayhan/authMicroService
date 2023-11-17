@@ -1,3 +1,4 @@
 {
-  "token_timeout_seconds": 36000
+  "token_timeout_seconds": 36000,
+  "default_key_path": "/private.key"
 }

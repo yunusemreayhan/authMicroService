@@ -8,8 +8,6 @@ import (
 	"os"
 )
 
-const DefaultKeyPath = "/private.key"
-
 var PrivateKey *rsa.PrivateKey
 
 func generatePrivateKey() *rsa.PrivateKey {
@@ -29,34 +27,43 @@ func StorePrivateKey(privateKey *rsa.PrivateKey, path_for_private_key string) {
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	err := os.WriteFile(path_for_private_key, privateKeyBytes, 0600)
 	if err != nil {
-		log.Fatalf("os.WriteFile: %v", err)
+		log.Printf("os.WriteFile: %v", err)
 	}
 
 	// store public key
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		log.Fatalf("x509.MarshalPKIXPublicKey: %v", err)
+		log.Printf("x509.MarshalPKIXPublicKey: %v", err)
 	}
 
 	err = os.WriteFile(path_for_private_key+".pub", publicKeyBytes, 0600)
 	if err != nil {
-		log.Fatalf("os.WriteFile: %v", err)
+		log.Printf("os.WriteFile: %v", err)
 	}
 }
 
-func LoadPrivateKey(path_for_private_key string) (*rsa.PrivateKey, error) {
+func LoadPrivateKey(pathForPrivateKey string) (*rsa.PrivateKey, error) {
 	// load private key
-	privateKeyBytes, err := os.ReadFile(path_for_private_key)
-	if err != nil {
-		return nil, err
+	if PrivateKey != nil {
+		return PrivateKey, nil
 	}
 
-	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBytes)
+	log.Default().Printf("loading privateKey")
+	privateKeyBytes, err := os.ReadFile(pathForPrivateKey)
 	if err != nil {
-		return nil, err
+		log.Default().Printf("GENERATE PRIVATE KEY")
+		key := generatePrivateKey()
+		StorePrivateKey(key, pathForPrivateKey)
+		PrivateKey = key
+	} else {
+		privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBytes)
+		if err != nil {
+			log.Fatalf("x509.ParsePKCS1PrivateKey: %v", err)
+		}
+		PrivateKey = privateKey
 	}
 
 	log.Default().Printf("returning loaded privateKey")
 
-	return privateKey, nil
+	return PrivateKey, nil
 }

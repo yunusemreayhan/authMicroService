@@ -1,4 +1,598 @@
 {
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
   "swagger": "2.0",
-  "paths": {}
+  "info": {
+    "description": "This sample swagger application",
+    "title": "Auth swagger generated app",
+    "termsOfService": "There are actually none.\nThis is for demonstration purpose only.\nSchemes:\nhttp\nhttps",
+    "contact": {
+      "name": "go-openapi maintainers",
+      "url": "https://github.com/yunusemreayhan/",
+      "email": "ayhanyunusemre@gmail.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    },
+    "version": "0.1.0"
+  },
+  "host": "localhost",
+  "basePath": "/",
+  "paths": {
+    "/api/login": {
+      "post": {
+        "description": "Login login API",
+        "tags": [
+          "users"
+        ],
+        "operationId": "login",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/loginRequest"
+            }
+          }
+        ]
+      }
+    },
+    "/api/person/{id}": {
+      "put": {
+        "description": "UpdateOne update one API",
+        "tags": [
+          "todos"
+        ],
+        "operationId": "updateOne",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/person"
+            }
+          },
+          {
+            "type": "string",
+            "name": "ID",
+            "in": "path",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "description": "DestroyOne destroy one API",
+        "tags": [
+          "todos"
+        ],
+        "operationId": "destroyOne",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "ID",
+            "in": "path",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/register": {
+      "post": {
+        "description": "Register register API",
+        "tags": [
+          "users"
+        ],
+        "operationId": "register",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/registrationRequest"
+            }
+          }
+        ]
+      }
+    },
+    "/api/verify": {
+      "get": {
+        "description": "Verify verify API",
+        "tags": [
+          "users"
+        ],
+        "operationId": "verify",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "Token",
+            "in": "header",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/person": {
+      "get": {
+        "description": "Find find API",
+        "tags": [
+          "users"
+        ],
+        "operationId": "find",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int32",
+            "name": "XRateLimit",
+            "in": "header",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "format": "int32",
+            "name": "Limit",
+            "in": "formData",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/person/login": {
+      "post": {
+        "description": "Login login API",
+        "tags": [
+          "users"
+        ],
+        "operationId": "login",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/loginRequest"
+            }
+          }
+        ]
+      }
+    },
+    "/person/register": {
+      "post": {
+        "description": "Register register API",
+        "tags": [
+          "users"
+        ],
+        "operationId": "register",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/registrationRequest"
+            }
+          }
+        ]
+      }
+    },
+    "/person/verify": {
+      "get": {
+        "description": "Verify verify API",
+        "tags": [
+          "users"
+        ],
+        "operationId": "verify",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "Token",
+            "in": "header",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/person/{id}": {
+      "put": {
+        "description": "UpdateOne update one API",
+        "tags": [
+          "todos"
+        ],
+        "operationId": "updateOne",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/person"
+            }
+          },
+          {
+            "type": "string",
+            "name": "ID",
+            "in": "path",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "description": "DestroyOne destroy one API",
+        "tags": [
+          "todos"
+        ],
+        "operationId": "destroyOne",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "ID",
+            "in": "path",
+            "required": true
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "error": {
+      "description": "Error error",
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "description": "code",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Code"
+        },
+        "message": {
+          "description": "message",
+          "type": "string",
+          "x-go-name": "Message"
+        }
+      },
+      "x-go-name": "Error",
+      "x-go-package": "github.com/yunusemreayhan/goAuthMicroService/models"
+    },
+    "loginRequest": {
+      "description": "LoginRequest login request",
+      "type": "object",
+      "required": [
+        "email",
+        "password",
+        "person_name"
+      ],
+      "properties": {
+        "email": {
+          "description": "email",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "Email"
+        },
+        "password": {
+          "description": "password",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "Password"
+        },
+        "person_name": {
+          "description": "person name",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "PersonName"
+        }
+      },
+      "x-go-name": "LoginRequest",
+      "x-go-package": "github.com/yunusemreayhan/goAuthMicroService/models"
+    },
+    "loginResponse": {
+      "description": "LoginResponse login response",
+      "type": "object",
+      "required": [
+        "token"
+      ],
+      "properties": {
+        "token": {
+          "description": "token",
+          "type": "string",
+          "x-go-name": "Token"
+        }
+      },
+      "x-go-name": "LoginResponse",
+      "x-go-package": "github.com/yunusemreayhan/goAuthMicroService/models"
+    },
+    "person": {
+      "description": "Person person",
+      "type": "object",
+      "required": [
+        "email",
+        "password",
+        "person_name"
+      ],
+      "properties": {
+        "email": {
+          "description": "email",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "Email"
+        },
+        "password": {
+          "description": "password",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "Password"
+        },
+        "person_name": {
+          "description": "person name",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "PersonName"
+        }
+      },
+      "x-go-name": "Person",
+      "x-go-package": "github.com/yunusemreayhan/goAuthMicroService/models"
+    },
+    "person_without_password": {
+      "description": "PersonWithoutPassword person without password",
+      "type": "object",
+      "required": [
+        "email",
+        "person_name"
+      ],
+      "properties": {
+        "email": {
+          "description": "email",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "Email"
+        },
+        "id": {
+          "description": "id",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ID",
+          "readOnly": true
+        },
+        "person_name": {
+          "description": "person name",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "PersonName"
+        }
+      },
+      "x-go-name": "PersonWithoutPassword",
+      "x-go-package": "github.com/yunusemreayhan/goAuthMicroService/models"
+    },
+    "registrationRequest": {
+      "description": "RegistrationRequest registration request",
+      "type": "object",
+      "required": [
+        "email",
+        "password",
+        "person_name"
+      ],
+      "properties": {
+        "email": {
+          "description": "email",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "Email"
+        },
+        "password": {
+          "description": "password",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "Password"
+        },
+        "person_name": {
+          "description": "person name",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "PersonName"
+        }
+      },
+      "x-go-name": "RegistrationRequest",
+      "x-go-package": "github.com/yunusemreayhan/goAuthMicroService/models"
+    },
+    "registrationResponse": {
+      "description": "RegistrationResponse registration response",
+      "type": "object",
+      "required": [
+        "email",
+        "person_name"
+      ],
+      "properties": {
+        "email": {
+          "description": "email",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "Email"
+        },
+        "id": {
+          "description": "id",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ID",
+          "readOnly": true
+        },
+        "person_name": {
+          "description": "person name",
+          "type": "string",
+          "minLength": 1,
+          "x-go-name": "PersonName"
+        }
+      },
+      "x-go-name": "RegistrationResponse",
+      "x-go-package": "github.com/yunusemreayhan/goAuthMicroService/models"
+    },
+    "verifyResponse": {
+      "description": "VerifyResponse verify response",
+      "type": "object",
+      "properties": {
+        "200": {
+          "description": "OK",
+          "x-go-name": "Nr200"
+        },
+        "error": {
+          "$ref": "#/definitions/error"
+        }
+      },
+      "x-go-name": "VerifyResponse",
+      "x-go-package": "github.com/yunusemreayhan/goAuthMicroService/models"
+    }
+  },
+  "responses": {
+    "destroyOneDefault": {
+      "description": "DestroyOneDefault error",
+      "schema": {
+        "$ref": "#/definitions/error"
+      },
+      "headers": {
+        "_statusCode": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "destroyOneNoContent": {
+      "description": "DestroyOneNoContent Deleted"
+    },
+    "findDefault": {
+      "description": "FindDefault error",
+      "schema": {
+        "$ref": "#/definitions/error"
+      },
+      "headers": {
+        "_statusCode": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "findOK": {
+      "description": "FindOK OK",
+      "headers": {
+        "body": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/person_without_password"
+          },
+          "description": "In: Body"
+        }
+      }
+    },
+    "loginDefault": {
+      "description": "LoginDefault error",
+      "schema": {
+        "$ref": "#/definitions/error"
+      },
+      "headers": {
+        "_statusCode": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "loginOK": {
+      "description": "LoginOK OK",
+      "schema": {
+        "$ref": "#/definitions/loginResponse"
+      },
+      "headers": {
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "registerCreated": {
+      "description": "RegisterCreated Created",
+      "schema": {
+        "$ref": "#/definitions/registrationResponse"
+      },
+      "headers": {
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "registerDefault": {
+      "description": "RegisterDefault error",
+      "schema": {
+        "$ref": "#/definitions/error"
+      },
+      "headers": {
+        "_statusCode": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "updateOneDefault": {
+      "description": "UpdateOneDefault error",
+      "schema": {
+        "$ref": "#/definitions/error"
+      },
+      "headers": {
+        "_statusCode": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "updateOneOK": {
+      "description": "UpdateOneOK OK",
+      "schema": {
+        "$ref": "#/definitions/person_without_password"
+      },
+      "headers": {
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "verifyDefault": {
+      "description": "VerifyDefault error",
+      "schema": {
+        "$ref": "#/definitions/error"
+      },
+      "headers": {
+        "_statusCode": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    },
+    "verifyOK": {
+      "description": "VerifyOK OK",
+      "schema": {
+        "$ref": "#/definitions/verifyResponse"
+      },
+      "headers": {
+        "body": {
+          "description": "In: Body"
+        }
+      }
+    }
+  }
 }

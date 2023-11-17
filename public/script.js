@@ -32,7 +32,7 @@ function OnRegister() {
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
   userData = {};
-  userData['username'] = username;
+  userData['person_name'] = username;
   userData['email'] = email;
   userData['password'] = password;
 
@@ -67,7 +67,7 @@ function OnRegister() {
       // if data type is json
       if (typeof data === 'object') {
         console.log(data);
-        window.location.href = "./login.html";
+        window.location.href = "login.html";
       } else {
         console.log(typeof data)
         alert(data);
@@ -83,17 +83,18 @@ function OnSignIn() {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
   userData = {};
-  userData['username'] = username;
+  userData['person_name'] = username;
   userData['password'] = password;
 
   console.log(userData);
+  let headers = new Headers();
+  headers.append('Content-Type', 'application/json');
+  headers.append('Authorization', 'Basic ' + btoa(username + ":" + password));
 
   fetch('/api/login', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(userData)
+    headers: headers,
+    body: JSON.stringify(userData),
   })
     .then(response => {
       try {
@@ -118,7 +119,7 @@ function OnSignIn() {
       if (typeof data === 'object') {
         console.log(data);
         localStorage.setItem('tokenAuthMicroService', data["voucher"]);
-        window.location.href = "./index.html";
+        window.location.href = "index.html";
       } else {
         console.log(typeof data)
         alert(data);
@@ -134,14 +135,14 @@ function OnVerify() {
   console.log("Verify called!");
   userData = {};
   userData['voucher'] = localStorage.getItem('tokenAuthMicroService');
+  let headers = new Headers();
+  headers.append('Content-Type', 'application/json');
+  headers.append('oauth_token', localStorage.getItem('tokenAuthMicroService'));
 
   console.log("verification data : ", userData);
   fetch('/api/verify', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(userData)
+    method: 'GET',
+    headers: headers
   })
     .then(response => {
       try {
@@ -150,7 +151,7 @@ function OnVerify() {
           response.text().then(text => {
             console.log("login verification failed : ", text);
             alert("login verification failed : " + text);
-            window.location.href = "./login.html";
+            window.location.href = "login.html";
           })
         } else {
           alert ("login verification success");
