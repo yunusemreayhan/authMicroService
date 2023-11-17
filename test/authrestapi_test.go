@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/yunusemreayhan/goAuthMicroService/internal/handler"
+	"github.com/yunusemreayhan/goAuthMicroService/internal/key"
 	"io"
 	"log"
 	"net/http"
@@ -76,7 +78,11 @@ func getProperVoucher() (*string, error) {
 		return nil, err
 	}
 	var modelResponse model.LoginResponse
-	_ = json.NewDecoder(resp.Body).Decode(&modelResponse)
+	err = json.NewDecoder(resp.Body).Decode(&modelResponse)
+	if err != nil {
+		log.Default().Println("Error while decoding response", err)
+		return nil, err
+	}
 	if modelResponse.Error != "" {
 		log.Default().Println("Error while sending request", modelResponse.Error)
 		return nil, fmt.Errorf("error while logging in : [%s]", modelResponse.Error)
@@ -92,14 +98,12 @@ func handlerForRegister(datai interface{}, client *http.Client) bool {
 	data := datai.(Data)
 	url := data.url
 	jsonData := data.jsonRequest
-
-	// Create a new HTTP request
 	req, err := http.NewRequest("POST", url, strings.NewReader(jsonData))
-	if err != nil {
-		log.Default().Println("Error while sending request", err)
-		return false
-	}
-	resp, err := client.Do(req)
+
+	var restApp handler.RestAPPForAuth
+	restApp.PrepareFiberApp()
+	restApp.SetPrivateKey(key.GeneratePrivateKey())
+	resp, err := restApp.GetFiberApp().Test(req, 30)
 	if err != nil {
 		log.Default().Println("Error sending request:", err)
 		return false
@@ -200,6 +204,10 @@ func handlerForVerify(datai interface{}, client *http.Client) bool {
 
 			var modelRegisterResponse model.RegistrationResponse
 			err = json.NewDecoder(resp.Body).Decode(&modelRegisterResponse)
+			if err != nil {
+				log.Default().Println("Error reading response body:", err)
+				return false
+			}
 			defer func(Body io.ReadCloser) {
 				err := Body.Close()
 				if err != nil {

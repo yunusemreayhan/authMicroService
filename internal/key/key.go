@@ -12,7 +12,7 @@ const DefaultKeyPath = "/private.key"
 
 var PrivateKey *rsa.PrivateKey
 
-func generatePrivateKey() *rsa.PrivateKey {
+func GeneratePrivateKey() *rsa.PrivateKey {
 	rng := rand.Reader
 	privateKey, err := rsa.GenerateKey(rng, 2048)
 	if err != nil {
@@ -23,7 +23,7 @@ func generatePrivateKey() *rsa.PrivateKey {
 
 func StorePrivateKey(privateKey *rsa.PrivateKey, path_for_private_key string) {
 	if privateKey == nil {
-		privateKey = generatePrivateKey()
+		privateKey = GeneratePrivateKey()
 	}
 	// store private key
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)

@@ -2,9 +2,11 @@ package handler
 
 import (
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
+	jwtware "github.com/gofiber/contrib/jwt"
 	"github.com/valyala/fasthttp"
 	"github.com/yunusemreayhan/goAuthMicroService/internal/config"
 	"log"
@@ -16,9 +18,17 @@ import (
 	"github.com/jackc/pgx/v5"
 	dbutils "github.com/yunusemreayhan/goAuthMicroService/db"
 	"github.com/yunusemreayhan/goAuthMicroService/db/sqlc"
-	"github.com/yunusemreayhan/goAuthMicroService/internal/key"
 	"github.com/yunusemreayhan/goAuthMicroService/internal/model"
 )
+
+type RestAPPForAuth struct {
+	app        *fiber.App
+	privateKey *rsa.PrivateKey
+}
+
+func (r *RestAPPForAuth) SetPrivateKey(toset *rsa.PrivateKey) {
+	r.privateKey = toset
+}
 
 // Authentication Microservice
 
@@ -30,7 +40,7 @@ import (
 // @Param person body RegistrationRequest true "Person registration data"
 // @Success 201 {object} RegistrationResponse
 // @Router /api/register [post]
-func RegisterPerson(c *fiber.Ctx) error {
+func (r *RestAPPForAuth) RegisterPerson(c *fiber.Ctx) error {
 	// Handle person registration
 	// try parsing request as json
 	var request model.RegistrationRequest
@@ -104,7 +114,7 @@ func RegisterPerson(c *fiber.Ctx) error {
 // @Param person body LoginRequest true "Person login data"
 // @Success 200 {string} string "JWT Token"
 // @Router /api/login [post]
-func LoginPerson(c *fiber.Ctx) error {
+func (r *RestAPPForAuth) LoginPerson(c *fiber.Ctx) error {
 	// try parsing request as json
 	var request model.LoginRequest
 	var username, email, password string
@@ -194,12 +204,11 @@ func LoginPerson(c *fiber.Ctx) error {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 
 	// Generate encoded voucher and send it as response.
-	privateKey, err := key.LoadPrivateKey(key.DefaultKeyPath)
 	if err != nil {
 		log.Printf("key.LoadPrivateKey: [%v]\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-	t, err := token.SignedString(privateKey)
+	t, err := token.SignedString(r.privateKey)
 	if err != nil {
 		log.Printf("token.SignedString: [%v]\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -217,7 +226,7 @@ func LoginPerson(c *fiber.Ctx) error {
 // @Success 200 {string} string "Access granted"
 // @Failure 401 {string} string "Access denied"
 // @Router /api/verify [get]
-func VerifyToken(c *fiber.Ctx) error {
+func (r *RestAPPForAuth) VerifyToken(c *fiber.Ctx) error {
 	var request model.VerifyVoucherRequest
 	res := json.Unmarshal(c.Request().Body(), &request)
 	defer func(request *fasthttp.Request) {
@@ -232,13 +241,6 @@ func VerifyToken(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf(`Was not able to parse request json json.Unmarshal: [%s]`, res.Error())})
 	}
 
-	// Generate encoded voucher and send it as response.
-	privateKey, err := key.LoadPrivateKey(key.DefaultKeyPath)
-	if err != nil {
-		log.Printf("key.LoadPrivateKey: [%v]\n", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Could not load private key"})
-	}
-
 	token, err := jwt.Parse(request.Token, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
@@ -246,7 +248,7 @@ func VerifyToken(c *fiber.Ctx) error {
 		}
 
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return privateKey.Public(), nil
+		return r.privateKey.Public(), nil
 	})
 
 	if err == nil {
@@ -279,7 +281,7 @@ func VerifyToken(c *fiber.Ctx) error {
 // @Param person body PersonUpdateRequest true "Person update data"
 // @Success 201 {string} string "Person information stored"
 // @Router /api/person [post]
-func UpdatePerson(c *fiber.Ctx) error {
+func (r *RestAPPForAuth) UpdatePerson(c *fiber.Ctx) error {
 	user := c.Locals("user").(*jwt.Token)
 	claims := user.Claims.(jwt.MapClaims)
 	username := claims["identifier"].(map[string]interface{})["username"].(string)
@@ -339,4 +341,41 @@ func UpdatePerson(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusMethodNotAllowed).JSON(fiber.Map{
 		"error": "Method not allowed!",
 	})
+}
+
+func (r *RestAPPForAuth) PrepareFiberApp() {
+	app := fiber.New()
+
+	// Custom config
+	app.Static("/", "/public/", fiber.Static{
+		Compress:      true,
+		ByteRange:     true,
+		Browse:        true,
+		Index:         "index.html",
+		CacheDuration: -1,
+		MaxAge:        0,
+	})
+
+	// Authentication Microservice
+	app.Post("/api/register", r.RegisterPerson)
+	app.Post("/api/login", r.LoginPerson)
+	app.Post("/api/verify", r.VerifyToken)
+
+	// JWT Middleware
+	app.Use(jwtware.New(jwtware.Config{
+		SigningKey: jwtware.SigningKey{
+			JWTAlg: jwtware.RS256,
+			Key:    r.privateKey,
+		},
+	}))
+
+	// Person Database Microservice
+	app.Get("/api/person", r.UpdatePerson)
+	app.Post("/api/person", r.UpdatePerson)
+
+	r.app = app
+}
+
+func (r *RestAPPForAuth) GetFiberApp() *fiber.App {
+	return r.app
 }
